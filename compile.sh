@@ -49,7 +49,7 @@ function TryCompileAutoTools {
 	
 	MakeBuild $Dir "$Dir/build"
 	
-	#if $configured then return 0 else return -1 fi
+	if [ $configured ]; then return 0 else return -1 fi
 }
 
 function TryUpdateMake {
@@ -86,9 +86,9 @@ function InitRepository {
 	local Dir = $2
   
 	CreateFolderStructure $1
-	TryInitRepoArchive $1 $2
-	TryInitRepoGit $1 $2
-	TryInitRepoSvn $1 $2
+	if[ (TryInitRepoArchive $1 $2) == 0 ]; then return 0
+	#TryInitRepoGit $1 $2
+	#TryInitRepoSvn $1 $2
 	
 	return 1
 }
