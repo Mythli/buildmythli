@@ -1,33 +1,57 @@
 #!/bin/bash
 
+set -e
+
 function TryInitRepoSvn {
-	local Dir=$1
+	local Url=$1
+	local Dir=$2
+	local Branche=$3
+	
+	local repoUrl="$Url/trunk";
+	if [[ "$Url" =~ ^.*svn.*$ ]]; then
+		if [ $Branche ]; then
+			repoUrl="$Url/branches/$Branche"
+		fi
+		cd $Dir
+		svn checkout "$Url/trunk" "$Dir/src"
+		return 0
+	fi
+	return 42
 }
 
 function TryInitRepoGit {
 	local Url=$1
 	local Dir=$2
 	local Branche=$3
-	set -e
 	
-	git clone "$Url" "$Dir" 2>&1 | tee "$Dir/log/init.log"
-	return 0
+	if [[ "$Url" =~ ^.*\.git.*$ ]]; then
+		git clone "$Url" "$Dir/src" 2>&1 | tee "$Dir/log/init.log"
+		if [ $Branche ]; then 
+			echo "lutscher"
+			git checkout $Branche 2>&1 | tee "$Dir/log/init.log"
+		fi
+		return 0
+	fi
+	return 42
 }
 
 function TryInitRepoArchive {
 	local Url=$1
 	local Dir=$2
-	set -e
 	
-	local fileName=$(mktemp)
-	wget -O "$fileName" "$Url" 2>&1 | tee "$Dir/log/init.log"
-	tar -vxzf "$fileName" -C "$Dir/src" 2>&1 | tee -a "$Dir/log/init.log"
-	for i in $( ls "$Dir/src" ); do
-		mv "$Dir/src/$i/"* "$Dir/src"
-		rmdir $Dir/src/$i
-	done
-	rm $fileName
-	return 0
+	if [[ "$Url" =~ ^.*((\.tar)|(\.gz))$ ]]; then
+		local fileName=$(mktemp)
+		wget -O "$fileName" "$Url" 2>&1 | tee "$Dir/log/init.log"
+		tar -vxzf "$fileName" -C "$Dir/src" 2>&1 | tee -a "$Dir/log/init.log"
+		local archiveDirs=$( ls "$Dir/src")
+		for i in $archiveDirs; do
+			mv "$Dir/src/$i/"* "$Dir/src"
+			rmdir $Dir/src/$i
+		done
+		rm $fileName
+		return 0
+	fi
+	return 42
 }
 
 function GetNumberOfCores {
@@ -44,6 +68,8 @@ function MakeBuild {
 function TryCompileCMake {
 	local Dir=$1
 }
+
+#31520
 
 function TryCompileAutoTools {
 	local Dir=$1
@@ -103,14 +129,17 @@ function CreateFolderStructure {
 function InitRepository {
 	local Url=$1
 	local Dir=$2
+	local Branche=$3
   
 	CreateFolderStructure $Dir
-	if TryInitRepoArchive $Url $Dir; then return 0; fi
-	if TryInitRepoGit $Url $Dir; then return 0; fi
-	#TryInitRepoGit $1 $2
-	#TryInitRepoSvn $1 $2
+	if TryInitRepoGit "$Url" "$Dir" "$Branche"; then return 0; fi
+	if TryInitRepoArchive "$Url" "$Dir"; then return 0; fi
+	if TryInitRepoSvn "$Url" "$Dir" "$Branche"; then return 0; fi
 	
-	return -1;
+	return 42;
 }
 
-InitRepository "http://nginx.org/download/nginx-1.2.3.tar.gz" "/home/tobias/Develop/projects/compile/test"
+rm -Rf "/home/tobias/Develop/projects/compile/test"
+#InitRepository "https://github.com/Mythli/SqlDatabase.git" "/home/tobias/Develop/projects/compile/test/git"
+#InitRepository "http://nginx.org/download/nginx-1.2.3.tar.gz" "/home/tobias/Develop/projects/compile/test/archive"
+InitRepository "http://cwowcms.googlecode.com/svn" "/home/tobias/Develop/projects/compile/test/svn"
