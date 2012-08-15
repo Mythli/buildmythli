@@ -28,7 +28,7 @@ function FindConfigure {
 }
 
 function ParseCheckoutType {
-	local $Url=$1
+	local Url=$1
 	
 	if [[ "$Url" =~ ^.*((\.tar)|(\.gz))$ ]]; then
 		echo "0"
@@ -126,9 +126,7 @@ function GenAutoTools {
 	fi
 		
 	cd "$Dir/src"
-	#echo $Dir
-	echo $(FindConfigure $Dir)
-	echo "$(FindConfigure $Dir) $argStr" 2>&1 | tee "$Dir/log/gen.log"
+	$(FindConfigure "$Dir") "$argStr" 2>&1 | tee "$Dir/log/gen.log"
 	return 42
 }
 
@@ -232,20 +230,5 @@ function InitRepository {
 	local Branche=$3
   
 	CreateFolderStructure "$Dir"
-	Checkout $Url $Dir $Branche
+	Checkout "$Url" "$Dir" "$Branche"
 }
-
-#rm -Rf "/home/tobias/Develop/projects/compile/test"
-#InitRepository "https://github.com/Mythli/SqlDatabase.git" "/home/tobias/Develop/projects/compile/test/git"
-#InitRepository "http://nginx.org/download/nginx-1.2.3.tar.gz" "/home/tobias/Develop/projects/compile/test/archive"
-#InitRepository "http://cwowcms.googlecode.com/svn" "/home/tobias/Develop/projects/compile/test/svn"
-
-declare -A compileArgs=( 
-	["builddit"]="cow"
-	["aa"]="test"
-)
-
-#InitRepository "svn://svn.lighttpd.net/xcache" "/home/tobias/Develop/projects/compile/test/xcache"
-#InitRepository "https://github.com/php/php-src.git" "/home/tobias/Develop/projects/compile/test/php" "PHP-5.4.6"
-
-GenMakeFiles "/home/tobias/Develop/projects/compile/test/archive" "$(declare -p compileArgs)"
