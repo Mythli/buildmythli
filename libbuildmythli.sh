@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 function GetNumberOfCores {
 	echo `cat /proc/cpuinfo | grep processor | wc -l`
 }
@@ -81,9 +79,19 @@ function LookupGenTool {
 function MakeBuild {
 	local Dir=$1
 	local BuildDir=$2
-	cd $BuildDir
-	make $1 -j$(GetNumberOfCores) 2>&1 | tee "$Dir/log/make.log"
+	
+	if [ -z $BuildDir ]; then
+		BuildDir="$Dir/build"
+	fi
+	make $1 -j$(GetNumberOfCores) 2>&1 | tee "$BuildDir/log/make.log"
 }
+
+#function InstallBuild {
+#	local Dir=$1
+#	local BuildDir=$2
+#	
+#	
+#}
 
 function GenCMake {
 	local Dir=$1
