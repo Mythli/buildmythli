@@ -2,122 +2,8 @@
 
 set -e
 
-function TryInitRepoSvn {
-	local Url=$1
-	local Dir=$2
-	local Branche=$3
-	
-	local repoUrl="$Url/trunk";
-	if [[ "$Url" =~ ^.*svn.*$ ]]; then
-		if [ $Branche ]; then
-			repoUrl="$Url/branches/$Branche"
-		fi
-		cd $Dir
-		svn checkout "$Url/trunk" "$Dir/src"
-		return 0
-	fi
-	return 42
-}
-
-function TryInitRepoGit {
-	local Url=$1
-	local Dir=$2
-	local Branche=$3
-	
-	if [[ "$Url" =~ ^.*\.git.*$ ]]; then
-		git clone "$Url" "$Dir/src" 2>&1 | tee "$Dir/log/init.log"
-		if [ $Branche ]; then 
-			echo "lutscher"
-			git checkout $Branche 2>&1 | tee "$Dir/log/init.log"
-		fi
-		return 0
-	fi
-	return 42
-}
-
-function TryInitRepoArchive {
-	local Url=$1
-	local Dir=$2
-	
-	if [[ "$Url" =~ ^.*((\.tar)|(\.gz))$ ]]; then
-		local fileName=$(mktemp)
-		wget -O "$fileName" "$Url" 2>&1 | tee "$Dir/log/init.log"
-		tar -vxzf "$fileName" -C "$Dir/src" 2>&1 | tee -a "$Dir/log/init.log"
-		local archiveDirs=$( ls "$Dir/src")
-		for i in $archiveDirs; do
-			mv "$Dir/src/$i/"* "$Dir/src"
-			rmdir $Dir/src/$i
-		done
-		rm $fileName
-		return 0
-	fi
-	return 42
-}
-
 function GetNumberOfCores {
-	return cores=`cat /proc/cpuinfo | grep processor | wc -l`
-}
-
-function MakeBuild {
-	local Dir=$1
-	local BuildDir = $2
-	local cores=GetNumberOfCores
-	echo "cd $BuildDir & make $1 -j$cores" &1 | tee -a "$Dir/log/build.log"
-}
-
-function TryCompileCMake {
-	local Dir=$1
-}
-
-#31520
-
-function TryCompileAutoTools {
-	local Dir=$1
-	
-	local declare -a arguments=("${!2}")
-	local configureBinarys = { "configure", "configure.sh"}
-	local configured = 0
-	(local ifs=$IFS
-	local IFS=" "
-	local argumentsStr="${arguments[*]}"
-	IFS=$ifs)
-		
-	for i in "${configureBinarys}"
-	do
-		local binary = $Dir/src/$configureBinarys[i]
-		if [ -e "$binary" ]; then
-			echo "$binary $argumentsStr" &1 | tee -a  "$Dir/log/configure.log"
-			configured = 1
-		fi
-	done
-	
-	MakeBuild $Dir "$Dir/build"
-	
-	if [ $configured ]; then return 0; else return -1; fi
-}
-
-function TryUpdateMake {
-	local Dir=$1
-}
-
-function TryUpdateGit {
-  local Dir=$1
-  
-  #if [ -d "$Dir" ]; then
-    
-  #fi
-}
-
-function TryUpdateSvn {
-	local Dir = $1
-}
-
-function Compile {
-	local Dir = $1
-}
-
-function Update {
-	local Dir = $1
+	echo `cat /proc/cpuinfo | grep processor | wc -l`
 }
 
 function CreateFolderStructure {
@@ -126,20 +12,210 @@ function CreateFolderStructure {
 	mkdir -p $Dir/{build,log,src}
 }
 
+function FindConfigure {
+	local Dir=$1
+	
+	local configureBinarys=(
+		"configure"
+		"configure.sh"
+	)
+	for binaryName in ${configureBinarys[@]}
+	do
+		if [ -e "$Dir/src/$binaryName" ]; then
+			echo "$Dir/src/$binaryName"
+			return 0
+		fi
+	done
+	return 42
+}
+
+function ParseCheckoutType {
+	local $Url=$1
+	
+	if [[ "$Url" =~ ^.*((\.tar)|(\.gz))$ ]]; then
+		echo "0"
+		return 0
+	fi
+	if [[ "$Url" =~ ^.*\.git.*$ ]]; then
+		echo "1"
+		return 0
+	fi
+	if [[ "$Url" =~ ^.*svn.*$ ]]; then
+		echo "2"
+		return 0
+	fi
+	return 42
+}
+
+function LookupCheckoutType {
+	local Dir=$1
+	
+	if [ -d "$Dir/src/.git" ]; then
+		echo "1"
+		return 0
+	fi
+	if [ -d "$Dir/src/.svn" ]; then
+		echo "2"
+		return 0
+	fi
+	return 42
+}
+
+function LookupGenTool {
+	local Dir=$1
+	
+	if [ -e "$Dir/CMakeLists.txt" ]; then
+		return 0
+		echo "0"
+	fi
+	
+	local configurePath=$(FindConfigure $Dir)
+	if [ -n $configurePath ]; then
+		echo "1"
+		return 0
+	fi
+	
+	return 42
+}
+
+function MakeBuild {
+	local Dir=$1
+	local BuildDir=$2
+	cd $BuildDir
+	make $1 -j$(GetNumberOfCores)  2>&1 | tee "$Dir/log/make.log"
+}
+
+function GenCMake {
+	local Dir=$1
+	eval "declare -A GenArgs="${2#*=}
+	
+	return 42
+}
+
+#31520
+
+function GenAutoTools {
+	local Dir=$1
+	eval "declare -A GenArgs="${2#*=}
+		
+	local argStr="--builddir=$Dir/build"
+	if [ $Branche ]; then
+		for argName in "${!GenArgs[@]}"; do
+			local argValue=${GenArgs["$argName"]}
+			argStr="$argStr --$argName=$argValue"
+		done
+	fi
+	
+	
+	cd "$Dir/src"
+	"$(FindConfigure $Dir)" "$argStr" 2>&1 | tee "$Dir/log/gen.log"
+}
+
+function TryUpdateGit {
+  local Dir=$1
+}
+
+function TryUpdateSvn {
+	local Dir = $1
+}
+
+function CheckoutSvn {
+	local Url=$1
+	local Dir=$2
+	local Branche=$3
+	
+	local repoUrl="$Url/trunk";
+	if [ $Branche ]; then
+		repoUrl="$Url/branches/$Branche"
+	fi
+	cd $Dir
+	svn checkout "$Url/trunk" "$Dir/src" 2>&1 | tee "$Dir/log/init.log"
+}
+
+function CheckoutGit {
+	local Url=$1
+	local Dir=$2
+	local Branche=$3
+	
+	git clone "$Url" "$Dir/src" 2>&1 | tee "$Dir/log/init.log"
+	if [ $Branche ]; then
+		cd "$Dir/src"
+		git checkout $Branche 2>&1 | tee "$Dir/log/init.log"
+	fi
+}
+
+function CheckoutArchive {
+	local Url=$1
+	local Dir=$2
+		
+	local fileName=$(mktemp)
+	wget -O "$fileName" "$Url" 2>&1 | tee "$Dir/log/init.log"
+	tar -vxzf "$fileName" -C "$Dir/src" 2>&1 | tee -a "$Dir/log/init.log"
+	local archiveDirs=$( ls "$Dir/src")
+	for i in $archiveDirs; do
+		mv "$Dir/src/$i/"* "$Dir/src"
+		rmdir $Dir/src/$i
+	done
+	rm $fileName
+}
+
+function Checkout {
+	local Url=$1
+	local Dir=$2
+	local Branche=$3
+	
+	case $(ParseCheckoutType "$Url") in
+		"0")
+		CheckoutArchive "$Url" "$Dir" ;;
+		"1")
+		CheckoutGit "$Url" "$Dir" "$Branche" ;;
+		"2")
+		CheckoutSvn "$Url" "$Dir" "$Branche" ;;
+	esac
+}
+
 function InitRepository {
 	local Url=$1
 	local Dir=$2
 	local Branche=$3
   
 	CreateFolderStructure $Dir
-	if TryInitRepoGit "$Url" "$Dir" "$Branche"; then return 0; fi
-	if TryInitRepoArchive "$Url" "$Dir"; then return 0; fi
-	if TryInitRepoSvn "$Url" "$Dir" "$Branche"; then return 0; fi
+	Checkout $Url $Dir $Branche
+}
+
+function Update {
+	local Dir = $1
+	local GenArgs=$2
 	
-	return 42;
+	if TryUpdateGit "$Dir"; then return 0; fi
+	if TryUpdateSvn "$Dir"; then return 0; fi
+	return 42
+}
+
+function GenMakeFiles {
+	local Dir=$1
+	local GenArgs=$2
+	
+	case $(LookupGenTool "$Dir") in
+		"0")
+		GenCMake "$Dir" "$GenArgs" ;;
+		"1")
+		GenAutoTools "$Dir" "$GenArgs" ;;
+	esac
+	return 42
 }
 
 rm -Rf "/home/tobias/Develop/projects/compile/test"
 #InitRepository "https://github.com/Mythli/SqlDatabase.git" "/home/tobias/Develop/projects/compile/test/git"
-#InitRepository "http://nginx.org/download/nginx-1.2.3.tar.gz" "/home/tobias/Develop/projects/compile/test/archive"
-InitRepository "http://cwowcms.googlecode.com/svn" "/home/tobias/Develop/projects/compile/test/svn"
+InitRepository "http://nginx.org/download/nginx-1.2.3.tar.gz" "/home/tobias/Develop/projects/compile/test/archive"
+#InitRepository "http://cwowcms.googlecode.com/svn" "/home/tobias/Develop/projects/compile/test/svn"
+
+declare -A compileArgs=( 
+	["builddit"]="cow"
+	["aa"]="test"
+)
+
+#InitRepository "svn://svn.lighttpd.net/xcache" "/home/tobias/Develop/projects/compile/test/xcache"
+#InitRepository "https://github.com/php/php-src.git" "/home/tobias/Develop/projects/compile/test/php" "PHP-5.4.6"
+
+GenMakeFiles "/home/tobias/Develop/projects/compile/test/archive"
