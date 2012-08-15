@@ -9,7 +9,7 @@ function GetNumberOfCores {
 function CreateFolderStructure {
 	local Dir=$1
 	
-	mkdir -p $Dir/{build,log,src}
+	mkdir -p "$Dir/"{build,log,src}
 }
 
 function FindConfigure {
@@ -69,7 +69,7 @@ function LookupGenTool {
 		echo "0"
 	fi
 	
-	local configurePath=$(FindConfigure $Dir)
+	local configurePath=$(FindConfigure "$Dir")
 	if [ -n $configurePath ]; then
 		echo "1"
 		return 0
@@ -82,41 +82,60 @@ function MakeBuild {
 	local Dir=$1
 	local BuildDir=$2
 	cd $BuildDir
-	make $1 -j$(GetNumberOfCores)  2>&1 | tee "$Dir/log/make.log"
+	make $1 -j$(GetNumberOfCores) 2>&1 | tee "$Dir/log/make.log"
 }
 
 function GenCMake {
 	local Dir=$1
-	eval "declare -A GenArgs="${2#*=}
+	local GenArgsStr=$2
+	
+	local argStr=""
+	if [ "$GenArgsStr" ]; then
+		eval "declare -A GenArgs="${GenArgsStr#*=}
+		for argName in "${!GenArgs[@]}"; do
+			local argValue=${GenArgs["$argName"]}
+			argStr="$argStr -D$argName=$argValue"
+		done
+	fi
+	
+	cd "$Dir/build"
+	cmake "$Dir/src" "$argStr" 2>&1 | tee "$Dir/log/gen.log"
 	
 	return 42
 }
 
-#31520
-
 function GenAutoTools {
 	local Dir=$1
-	eval "declare -A GenArgs="${2#*=}
-		
+	local GenArgsStr=$2
+	
 	local argStr="--builddir=$Dir/build"
-	if [ $Branche ]; then
+	if [ "$GenArgsStr" ]; then
+		eval "declare -A GenArgs="${GenArgsStr#*=}
 		for argName in "${!GenArgs[@]}"; do
 			local argValue=${GenArgs["$argName"]}
 			argStr="$argStr --$argName=$argValue"
 		done
 	fi
-	
+		
+	cd "$Dir/src"
+	#echo $Dir
+	echo $(FindConfigure $Dir)
+	echo "$(FindConfigure $Dir) $argStr" 2>&1 | tee "$Dir/log/gen.log"
+	return 42
+}
+
+function UpdateGit {
+  local Dir=$1
+  
+  cd "$Dir/src"
+  git pull 2>&1 | tee -a "$Dir/log/update.log"
+}
+
+function UpdateSvn {
+	local Dir = $1
 	
 	cd "$Dir/src"
-	"$(FindConfigure $Dir)" "$argStr" 2>&1 | tee "$Dir/log/gen.log"
-}
-
-function TryUpdateGit {
-  local Dir=$1
-}
-
-function TryUpdateSvn {
-	local Dir = $1
+	svn update  2>&1 | tee "$Dir/log/gen.log"
 }
 
 function CheckoutSvn {
@@ -174,21 +193,15 @@ function Checkout {
 	esac
 }
 
-function InitRepository {
-	local Url=$1
-	local Dir=$2
-	local Branche=$3
-  
-	CreateFolderStructure $Dir
-	Checkout $Url $Dir $Branche
-}
-
 function Update {
 	local Dir = $1
-	local GenArgs=$2
 	
-	if TryUpdateGit "$Dir"; then return 0; fi
-	if TryUpdateSvn "$Dir"; then return 0; fi
+	case $(LookupCheckoutType "$Dir") in
+		"0")
+		UpdateGit $Dir ;;
+		"1")
+		UpdateSvn $Dir ;;
+	esac
 	return 42
 }
 
@@ -205,9 +218,18 @@ function GenMakeFiles {
 	return 42
 }
 
-rm -Rf "/home/tobias/Develop/projects/compile/test"
+function InitRepository {
+	local Url=$1
+	local Dir=$2
+	local Branche=$3
+  
+	CreateFolderStructure "$Dir"
+	Checkout $Url $Dir $Branche
+}
+
+#rm -Rf "/home/tobias/Develop/projects/compile/test"
 #InitRepository "https://github.com/Mythli/SqlDatabase.git" "/home/tobias/Develop/projects/compile/test/git"
-InitRepository "http://nginx.org/download/nginx-1.2.3.tar.gz" "/home/tobias/Develop/projects/compile/test/archive"
+#InitRepository "http://nginx.org/download/nginx-1.2.3.tar.gz" "/home/tobias/Develop/projects/compile/test/archive"
 #InitRepository "http://cwowcms.googlecode.com/svn" "/home/tobias/Develop/projects/compile/test/svn"
 
 declare -A compileArgs=( 
@@ -218,4 +240,4 @@ declare -A compileArgs=(
 #InitRepository "svn://svn.lighttpd.net/xcache" "/home/tobias/Develop/projects/compile/test/xcache"
 #InitRepository "https://github.com/php/php-src.git" "/home/tobias/Develop/projects/compile/test/php" "PHP-5.4.6"
 
-GenMakeFiles "/home/tobias/Develop/projects/compile/test/archive"
+GenMakeFiles "/home/tobias/Develop/projects/compile/test/archive" "$(declare -p compileArgs)"
