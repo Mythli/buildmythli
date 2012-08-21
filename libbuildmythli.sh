@@ -1,5 +1,12 @@
 #!/bin/bash
 
+CHECKOUT_ARCHIVE=0
+CHECKOUT_GIT=1
+CHECKOUT_SVN=2
+
+GENTOOL_CMAKE=0
+GENTOOL_AUTOTOOLS=1
+
 function GetNumberOfCores {
 	echo `cat /proc/cpuinfo | grep processor | wc -l`
 }
@@ -31,15 +38,15 @@ function ParseCheckoutType {
 	local Url=$1
 	
 	if [[ "$Url" =~ ^.*((\.tar)|(\.gz))$ ]]; then
-		echo "0"
+		echo "$CHECKOUT_ARCHIVE"
 		return 0
 	fi
 	if [[ "$Url" =~ ^.*\.git.*$ ]]; then
-		echo "1"
+		echo "$CHECKOUT_GIT"
 		return 0
 	fi
 	if [[ "$Url" =~ ^.*svn.*$ ]]; then
-		echo "2"
+		echo "$CHECKOUT_SVN"
 		return 0
 	fi
 	return 42
@@ -49,11 +56,11 @@ function LookupCheckoutType {
 	local Dir=$1
 	
 	if [ -d "$Dir/src/.git" ]; then
-		echo "1"
+		echo "$CHECKOUT_GIT"
 		return 0
 	fi
 	if [ -d "$Dir/src/.svn" ]; then
-		echo "2"
+		echo "$CHECKOUT_SVN"
 		return 0
 	fi
 	return 42
@@ -64,12 +71,12 @@ function LookupGenTool {
 	
 	if [ -e "$Dir/CMakeLists.txt" ]; then
 		return 0
-		echo "0"
+		echo "$GENTOOL_CMAKE"
 	fi
 	
 	local configurePath=$(FindConfigure "$Dir")
 	if [ -n $configurePath ]; then
-		echo "1"
+		echo "$GENTOOL_AUTOTOOLS"
 		return 0
 	fi
 	
