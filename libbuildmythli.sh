@@ -230,12 +230,3 @@ function GenMakeFiles {
 	esac
 	return 42
 }
-
-function InitRepository {
-	local Url=$1
-	local Dir=$2
-	local Branche=$3
-  
-	CreateFolderStructure "$Dir"
-	Checkout "$Url" "$Dir" "$Branche"
-}
