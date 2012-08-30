@@ -12,13 +12,13 @@ function GetNumberOfCores {
 }
 
 function CreateFolderStructure {
-	local Dir=$1
+	local dir=$1
 	
-	mkdir -p "$Dir/"{build,log,src}
+	mkdir -p "$dir/"{build,log,src}
 }
 
 function FindConfigure {
-	local Dir=$1
+	local dir=$1
 	
 	local configureBinarys=(
 		"configure"
@@ -26,8 +26,8 @@ function FindConfigure {
 	)
 	for binaryName in ${configureBinarys[@]}
 	do
-		if [ -e "$Dir/src/$binaryName" ]; then
-			echo "$Dir/src/$binaryName"
+		if [ -e "$dir/src/$binaryName" ]; then
+			echo "$dir/src/$binaryName"
 			return 0
 		fi
 	done
@@ -35,17 +35,17 @@ function FindConfigure {
 }
 
 function ParseCheckoutType {
-	local Url=$1
+	local url=$1
 	
-	if [[ "$Url" =~ ^.*((\.tar)|(\.gz))$ ]]; then
+	if [[ "$url" =~ ^.*((\.tar)|(\.gz))$ ]]; then
 		echo "$CHECKOUT_ARCHIVE"
 		return 0
 	fi
-	if [[ "$Url" =~ ^.*\.git.*$ ]]; then
+	if [[ "$url" =~ ^.*\.git.*$ ]]; then
 		echo "$CHECKOUT_GIT"
 		return 0
 	fi
-	if [[ "$Url" =~ ^.*svn.*$ ]]; then
+	if [[ "$url" =~ ^.*svn.*$ ]]; then
 		echo "$CHECKOUT_SVN"
 		return 0
 	fi
@@ -53,13 +53,13 @@ function ParseCheckoutType {
 }
 
 function LookupCheckoutType {
-	local Dir=$1
+	local dir=$1
 	
-	if [ -d "$Dir/src/.git" ]; then
+	if [ -d "$dir/src/.git" ]; then
 		echo "$CHECKOUT_GIT"
 		return 0
 	fi
-	if [ -d "$Dir/src/.svn" ]; then
+	if [ -d "$dir/src/.svn" ]; then
 		echo "$CHECKOUT_SVN"
 		return 0
 	fi
@@ -67,14 +67,14 @@ function LookupCheckoutType {
 }
 
 function LookupGenTool {
-	local Dir=$1
+	local dir=$1
 	
-	if [ -e "$Dir/CMakeLists.txt" ]; then
+	if [ -e "$dir/CMakeLists.txt" ]; then
 		return 0
 		echo "$GENTOOL_CMAKE"
 	fi
 	
-	local configurePath=$(FindConfigure "$Dir")
+	local configurePath=$(FindConfigure "$dir")
 	if [ -n $configurePath ]; then
 		echo "$GENTOOL_AUTOTOOLS"
 		return 0
@@ -84,11 +84,11 @@ function LookupGenTool {
 }
 
 function MakeBuild {
-	local Dir=$1
+	local dir=$1
 	local BuildDir=$2
 	
 	if [ -z $BuildDir ]; then
-		BuildDir="$Dir/build"
+		BuildDir="$dir/build"
 	fi
 	make $1 -j$(GetNumberOfCores) 2>&1 | tee "$BuildDir/log/make.log"
 }
@@ -101,132 +101,132 @@ function MakeBuild {
 #}
 
 function GenCMake {
-	local Dir=$1
-	local GenArgsStr=$2
+	local dir=$1
+	local genArgsStr=$2
 	
 	local argStr=""
-	if [ "$GenArgsStr" ]; then
-		eval "declare -A GenArgs="${GenArgsStr#*=}
+	if [ "$genArgsStr" ]; then
+		eval "declare -A GenArgs="${genArgsStr#*=}
 		for argName in "${!GenArgs[@]}"; do
 			local argValue=${GenArgs["$argName"]}
 			argStr="$argStr -D$argName=$argValue"
 		done
 	fi
 	
-	cd "$Dir/build"
-	cmake "$Dir/src" "$argStr" 2>&1 | tee "$Dir/log/gen.log"
+	cd "$dir/build"
+	cmake "$dir/src" "$argStr" 2>&1 | tee "$dir/log/gen.log"
 	
 	return 42
 }
 
 function GenAutoTools {
-	local Dir=$1
-	local GenArgsStr=$2
+	local dir=$1
+	local genArgsStr=$2
 	
-	local argStr="--builddir=$Dir/build"
-	if [ "$GenArgsStr" ]; then
-		eval "declare -A GenArgs="${GenArgsStr#*=}
+	local argStr="--builddir=$dir/build"
+	if [ "$genArgsStr" ]; then
+		eval "declare -A GenArgs="${genArgsStr#*=}
 		for argName in "${!GenArgs[@]}"; do
 			local argValue=${GenArgs["$argName"]}
 			argStr="$argStr --$argName=$argValue"
 		done
 	fi
 		
-	cd "$Dir/src"
-	$(FindConfigure "$Dir") "$argStr" 2>&1 | tee "$Dir/log/gen.log"
+	cd "$dir/src"
+	$(FindConfigure "$dir") "$argStr" 2>&1 | tee "$dir/log/gen.log"
 	return 42
 }
 
 function UpdateGit {
-  local Dir=$1
+  local dir=$1
   
-  cd "$Dir/src"
-  git pull 2>&1 | tee -a "$Dir/log/update.log"
+  cd "$dir/src"
+  git pull 2>&1 | tee -a "$dir/log/update.log"
 }
 
 function UpdateSvn {
-	local Dir = $1
+	local dir = $1
 	
-	cd "$Dir/src"
-	svn update  2>&1 | tee "$Dir/log/gen.log"
+	cd "$dir/src"
+	svn update  2>&1 | tee "$dir/log/gen.log"
 }
 
 function CheckoutSvn {
-	local Url=$1
-	local Dir=$2
-	local Branche=$3
+	local url=$1
+	local dir=$2
+	local branche=$3
 	
-	local repoUrl="$Url/trunk";
-	if [ $Branche ]; then
-		repoUrl="$Url/branches/$Branche"
+	local repoUrl="$url/trunk";
+	if [ $branche ]; then
+		repoUrl="$url/branches/$branche"
 	fi
-	cd $Dir
-	svn checkout "$Url/trunk" "$Dir/src" 2>&1 | tee "$Dir/log/init.log"
+	cd $dir
+	svn checkout "$url/trunk" "$dir/src" 2>&1 | tee "$dir/log/init.log"
 }
 
 function CheckoutGit {
-	local Url=$1
-	local Dir=$2
-	local Branche=$3
+	local url=$1
+	local dir=$2
+	local branche=$3
 	
-	git clone "$Url" "$Dir/src" 2>&1 | tee "$Dir/log/init.log"
-	if [ $Branche ]; then
-		cd "$Dir/src"
-		git checkout $Branche 2>&1 | tee "$Dir/log/init.log"
+	git clone "$url" "$dir/src" 2>&1 | tee "$dir/log/init.log"
+	if [ $branche ]; then
+		cd "$dir/src"
+		git checkout $branche 2>&1 | tee "$dir/log/init.log"
 	fi
 }
 
 function CheckoutArchive {
-	local Url=$1
-	local Dir=$2
+	local url=$1
+	local dir=$2
 		
 	local fileName=$(mktemp)
-	wget -O "$fileName" "$Url" 2>&1 | tee "$Dir/log/init.log"
-	tar -vxzf "$fileName" -C "$Dir/src" 2>&1 | tee -a "$Dir/log/init.log"
-	local archiveDirs=$( ls "$Dir/src")
+	wget -O "$fileName" "$url" 2>&1 | tee "$dir/log/init.log"
+	tar -vxzf "$fileName" -C "$dir/src" 2>&1 | tee -a "$dir/log/init.log"
+	local archiveDirs=$( ls "$dir/src")
 	for i in $archiveDirs; do
-		mv "$Dir/src/$i/"* "$Dir/src"
-		rmdir $Dir/src/$i
+		mv "$dir/src/$i/"* "$dir/src"
+		rmdir "$dir/src/$i"
 	done
 	rm $fileName
 }
 
 function Checkout {
-	local Url=$1
-	local Dir=$2
-	local Branche=$3
+	local url=$1
+	local dir=$2
+	local branche=$3
 	
-	case $(ParseCheckoutType "$Url") in
+	case $(ParseCheckoutType "$url") in
 		"0")
-		CheckoutArchive "$Url" "$Dir" ;;
+		CheckoutArchive "$url" "$dir" ;;
 		"1")
-		CheckoutGit "$Url" "$Dir" "$Branche" ;;
+		CheckoutGit "$url" "$dir" "$branche" ;;
 		"2")
-		CheckoutSvn "$Url" "$Dir" "$Branche" ;;
+		CheckoutSvn "$url" "$dir" "$branche" ;;
 	esac
 }
 
 function Update {
-	local Dir = $1
+	local dir = $1
 	
-	case $(LookupCheckoutType "$Dir") in
+	case $(LookupCheckoutType "$dir") in
 		"0")
-		UpdateGit $Dir ;;
+		UpdateGit $dir ;;
 		"1")
-		UpdateSvn $Dir ;;
+		UpdateSvn $dir ;;
 	esac
 	return 42
 }
 
 function GenMakeFiles {
-	local Dir=$1
+	local dir=$1
 	local GenArgs=$2
 	
-	case $(LookupGenTool "$Dir") in
+	case $(LookupGenTool "$dir") in
 		"0")
-		GenCMake "$Dir" "$GenArgs" ;;
+		GenCMake "$dir" "$GenArgs" ;;
 		"1")
-		GenAutoTools "$Dir" "$GenArgs" ;;
+		GenAutoTools "$dir" "$GenArgs" ;;
 	esac
 	return 42
 }

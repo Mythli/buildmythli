@@ -31,6 +31,7 @@ function PrintVersion
 
 function BuildMythliScript
 {
+	echo ''
 }
 
 function InitRepository
