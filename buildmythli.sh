@@ -32,7 +32,7 @@ function PrintVersion
 function BuildMythliScript
 {
 	ln "$BaseDir"/libbuildmythli.sh "$dir"/.libbuildmythli.sh
-	cp "$BaseDir"/dummy.sh "$dir"/buildmythli.sh
+	cp "$BaseDir"/buildmythli.dummy.sh "$dir"/buildmythli.sh
 }
 
 function InitRepository
