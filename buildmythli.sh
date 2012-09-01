@@ -31,26 +31,32 @@ function PrintVersion
 
 function BuildMythliScript
 {
-	echo ''
+	ln "$BaseDir"/libbuildmythli.sh "$dir"/.libbuildmythli.sh
+	cp "$BaseDir"/dummy.sh "$dir"/buildmythli.sh
 }
 
 function InitRepository
 {
 	local url=$1
 	local dir=$2
-	local type=$3
+	local initType=$3
 	
-	echo 'Creating folder Structure...'
+	echo "Creating folder Structure in $dir..."
 	CreateFolderStructure "$dir"
-	echo 'Downloading source...'
+	echo "Downloading source from $url..."
 	Checkout "$url" "$dir" $type
-	echo 'Writing buildmythli script to file...'
+	echo "Writing buildmythli script to $dir/buildmythli.sh..."
 	BuildMythliScript "$url" "$dir" $type
 }
 
 function ExecuteMode
 {
-	case $Mode in
+	local mode=$1
+	local url=$2
+	local dir=$3
+	local initType=$4
+
+	case $mode in
 		BUILDMYTHLI_HELP)
 			PrintHelp
 		;;
@@ -58,14 +64,15 @@ function ExecuteMode
 			PrintVersion
 		;;
 		BUILDMYTHLI_INIT)
-			InitRepository "$Url" "$Dir"
+			InitRepository "$url" "$dir" $initType
 		;;
 		BUILDMYTHLI_TEST)
 			rm -Rf "$BaseDir/test"
 			mkdir "$BaseDir/test"
 			
 			echo 'Git test...'
-			$BaseDir/buildmythli.sh --init --url=https://github.com/Mythli/buildmythli.git --dir=/home/tobias/Develop/projects/buildmythli/test/git
+			ls
+			bash -x $BaseDir/buildmythli.sh --init "https://github.com/Mythli/buildmythli.git" "/home/tobias/Develop/projects/buildmythli/test/git"
 		;;
 	esac
 }
@@ -77,7 +84,7 @@ eval set -- "$GetOptEscapeHelper"
 
 Dir=""
 Url=""
-Mode=BUILDMYTHLI_INIT
+Mode=BUILDMYTHLI_HELP
 
 while true;
 do
@@ -118,4 +125,12 @@ do
 	esac
 done
 
-ExecuteMode
+if [ -z "$Url" ]; then
+	Url=$1
+fi
+
+if [ -z "$Dir" ]; then
+	Dir=$2
+fi
+
+ExecuteMode $Mode $Url $Dir

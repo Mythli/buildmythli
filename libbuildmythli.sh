@@ -85,20 +85,24 @@ function LookupGenTool {
 
 function MakeBuild {
 	local dir=$1
-	local BuildDir=$2
+	local buildDir=$2
 	
+	if [ -z $buildDir ]; then
+		buildDir="$dir/build"
+	fi
+	cd "$buildDir"
+	make -j$(GetNumberOfCores) 2>&1 | tee "$dir/log/make.log"
+}
+
+function InstallBuild {
+	local dir=$1
+	local buildDir=$2
 	if [ -z $BuildDir ]; then
 		BuildDir="$dir/build"
 	fi
-	make $1 -j$(GetNumberOfCores) 2>&1 | tee "$BuildDir/log/make.log"
+	
+	make install 2>&1 | tee "$dir/log/make.log"
 }
-
-#function InstallBuild {
-#	local Dir=$1
-#	local BuildDir=$2
-#	
-#	
-#}
 
 function GenCMake {
 	local dir=$1
@@ -145,7 +149,7 @@ function UpdateGit {
 }
 
 function UpdateSvn {
-	local dir = $1
+	local dir=$1
 	
 	cd "$dir/src"
 	svn update  2>&1 | tee "$dir/log/gen.log"
@@ -207,7 +211,7 @@ function Checkout {
 }
 
 function Update {
-	local dir = $1
+	local dir=$1
 	
 	case $(LookupCheckoutType "$dir") in
 		"0")
