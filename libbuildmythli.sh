@@ -7,6 +7,19 @@ CHECKOUT_SVN=2
 GENTOOL_CMAKE=0
 GENTOOL_AUTOTOOLS=1
 
+function GetBaseDir {
+	pathTo=$1
+	if [ -z "$pathTo" ]; then
+		pathTo='.'
+	fi
+
+    local parentDir=$(dirname "$pathTo")
+    cd "$parentDir"
+    local absolutePath="$(pwd)"/"$(basename $pathTo)"
+    cd - >/dev/null
+    echo ${absolutePath%?}
+}
+
 function GetNumberOfCores {
 	echo `cat /proc/cpuinfo | grep processor | wc -l`
 }
@@ -38,15 +51,15 @@ function ParseCheckoutType {
 	local url=$1
 	
 	if [[ "$url" =~ ^.*((\.tar)|(\.gz))$ ]]; then
-		echo "$CHECKOUT_ARCHIVE"
+		echo $CHECKOUT_ARCHIVE
 		return 0
 	fi
 	if [[ "$url" =~ ^.*\.git.*$ ]]; then
-		echo "$CHECKOUT_GIT"
+		echo $CHECKOUT_GIT
 		return 0
 	fi
 	if [[ "$url" =~ ^.*svn.*$ ]]; then
-		echo "$CHECKOUT_SVN"
+		echo $CHECKOUT_SVN
 		return 0
 	fi
 	return 42
@@ -56,11 +69,11 @@ function LookupCheckoutType {
 	local dir=$1
 	
 	if [ -d "$dir/src/.git" ]; then
-		echo "$CHECKOUT_GIT"
+		echo $CHECKOUT_GIT
 		return 0
 	fi
 	if [ -d "$dir/src/.svn" ]; then
-		echo "$CHECKOUT_SVN"
+		echo $CHECKOUT_SVN
 		return 0
 	fi
 	return 42
@@ -70,13 +83,13 @@ function LookupGenTool {
 	local dir=$1
 	
 	if [ -e "$dir/CMakeLists.txt" ]; then
+		echo $GENTOOL_CMAKE
 		return 0
-		echo "$GENTOOL_CMAKE"
 	fi
 	
 	local configurePath=$(FindConfigure "$dir")
-	if [ -n $configurePath ]; then
-		echo "$GENTOOL_AUTOTOOLS"
+	if [ -e $configurePath ]; then
+		echo $GENTOOL_AUTOTOOLS
 		return 0
 	fi
 	
@@ -119,8 +132,6 @@ function GenCMake {
 	
 	cd "$dir/build"
 	cmake "$dir/src" "$argStr" 2>&1 | tee "$dir/log/gen.log"
-	
-	return 42
 }
 
 function GenAutoTools {
@@ -138,7 +149,6 @@ function GenAutoTools {
 		
 	cd "$dir/src"
 	$(FindConfigure "$dir") "$argStr" 2>&1 | tee "$dir/log/gen.log"
-	return 42
 }
 
 function UpdateGit {
@@ -201,12 +211,18 @@ function Checkout {
 	local branche=$3
 	
 	case $(ParseCheckoutType "$url") in
-		"0")
-		CheckoutArchive "$url" "$dir" ;;
-		"1")
-		CheckoutGit "$url" "$dir" "$branche" ;;
-		"2")
-		CheckoutSvn "$url" "$dir" "$branche" ;;
+		$CHECKOUT_ARCHIVE)
+			CheckoutArchive "$url" "$dir"
+			return 0
+		;;
+		$CHECKOUT_GIT)
+			CheckoutGit "$url" "$dir" "$branche";
+			return 0
+		;;
+		$CHECKOUT_SVN)
+			CheckoutSvn "$url" "$dir" "$branche";
+			return 0
+		;;
 	esac
 }
 
@@ -214,23 +230,31 @@ function Update {
 	local dir=$1
 	
 	case $(LookupCheckoutType "$dir") in
-		"0")
-		UpdateGit $dir ;;
-		"1")
-		UpdateSvn $dir ;;
+		$CHECKOUT_GIT)
+			UpdateGit $dir
+			return 0
+		;;
+		$CHECKOUT_SVN)
+			UpdateSvn $dir
+			return 0
+		;;
 	esac
-	return 42
+	return 42;
 }
 
 function GenMakeFiles {
 	local dir=$1
-	local GenArgs=$2
+	local genArgs=$2
 	
 	case $(LookupGenTool "$dir") in
-		"0")
-		GenCMake "$dir" "$GenArgs" ;;
-		"1")
-		GenAutoTools "$dir" "$GenArgs" ;;
+		$GENTOOL_CMAKE)
+			GenCMake "$dir" "$genArgs"
+			return 0
+		;;
+		$GENTOOL_AUTOTOOLS)
+			GenAutoTools "$dir" "$genArgs"
+			return 0
+		;;
 	esac
-	return 42
+	return 42;
 }
