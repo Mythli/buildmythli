@@ -2,6 +2,7 @@
 set -e
 source "./libbuildmythli.sh"
 BaseDir=$(GetBaseDir)
+echo $BaseDir
 
 BUILDMYTHLI_INIT=0
 BUILDMYTHLI_HELP=1
@@ -35,23 +36,20 @@ function PrintVersion
 
 function BuildMythliScript
 {
-	ln "$BaseDir"/libbuildmythli.sh "$dir"/.libbuildmythli.sh
+	local dir=$1
+	ln -f "$BaseDir"/libbuildmythli.sh "$dir"/.libbuildmythli.sh
 	cp "$BaseDir"/buildmythli.dummy.sh "$dir"/buildmythli.sh
 }
 
 function InitRepository
 {
-	local url=$1
-	local dir=$2
+	local dir=$1
+	local url=$2
+	echo "${CFXBold}Downloading source...${CFXDefault}"
+	local checkoutResult=$(Checkout "$dir" "$url")
 	
-	echo "${CFXBold}Creating folder Structure in $dir...${CFXDefault}"
-	CreateFolderStructure "$dir"
-	
-	echo "${CFXBold}Downloading source from $url...${CFXDefault}"
-	Checkout "$url" "$dir" $type
-	
-	echo "${CFXBold}Writing buildmythli script to $dir/buildmythli.sh...${CFXDefault}"
-	BuildMythliScript "$url" "$dir"
+	echo "${CFXBold}Writing buildmythli script...${CFXDefault}"
+	$(BuildMythliScript "$dir" "$url") 
 	
 	echo "${CFXGreen}Repository initialized.${CFXDefault}"
 }
@@ -59,25 +57,27 @@ function InitRepository
 function ExecuteMode
 {
 	local mode=$1
-	local url=$2
-	local dir=$3
+	local dir=$2
+	local url=$3
 	
 	case $mode in
-		BUILDMYTHLI_HELP)
+		$BUILDMYTHLI_HELP)
 			PrintHelp
 		;;
-		BUILDMYTHLI_VERSION)
+		$BUILDMYTHLI_VERSION)
 			PrintVersion
 		;;
-		BUILDMYTHLI_INIT)
-			InitRepository "$url" "$dir"
+		$BUILDMYTHLI_INIT)
+			InitRepository "$dir" "$url"
 		;;
-		BUILDMYTHLI_TEST)
+		$BUILDMYTHLI_TEST)
 			rm -Rf "$BaseDir/test"
 			mkdir "$BaseDir/test"
 			
-			echo 'Git test...'
-			$BaseDir/buildmythli.sh --init "https://github.com/Mythli/buildmythli.git" "/home/tobias/Develop/projects/buildmythli/test/git"
+			#echo 'Git test...'
+			#bash -x $BaseDir/buildmythli.sh --init  --dir="/home/tobias/Develop/projects/buildmythli/test/git" --url="https://github.com/Mythli/buildmythli.git"
+			echo 'Folder test...'
+			bash -x $BaseDir/buildmythli.sh --init --dir="/home/tobias/Develop/src/thelegacy/RCMeta"
 		;;
 	esac
 }
@@ -89,7 +89,7 @@ eval set -- "$GetOptEscapeHelper"
 
 Dir=""
 Url=""
-Mode=BUILDMYTHLI_HELP
+Mode=$BUILDMYTHLI_HELP
 
 while true;
 do
@@ -98,19 +98,19 @@ do
 	
 	case "$argName" in
 		-h|--help)
-			Mode=BUILDMYTHLI_HELP
+			Mode=$BUILDMYTHLI_HELP
 			shift
 		;;
 		-v|--version)
-			Mode=BUILDMYTHLI_VERSION
+			Mode=$BUILDMYTHLI_VERSION
 			shift
 		;;
 		-i|--init)
-			Mode=BUILDMYTHLI_INIT
+			Mode=$BUILDMYTHLI_INIT
 			shift
 		;;
 		--test)
-			Mode=BUILDMYTHLI_TEST
+			Mode=$BUILDMYTHLI_TEST
 			shift
 		;;
 		--init-type)
@@ -130,12 +130,13 @@ do
 	esac
 done
 
-if [ -z "$Url" ]; then
-	Url=$1
-fi
-
 if [ -z "$Dir" ]; then
-	Dir=$2
+	Dir=$1
 fi
 
-ExecuteMode $Mode $Url $Dir
+if [ -z "$Url" ]; then
+	Url=$2
+fi
+
+
+ExecuteMode $Mode "$Dir" "$Url"
