@@ -15,7 +15,7 @@ CFXDefault=$(tput sgr0)
 
 function PrintHelp
 {
-	echo "Usage: buildmythli [OPTION]... [URL]... [DIRECTORY]..."
+	echo "Usage: buildmythli [OPTION]...[DIRECTORY]...[URL]..."
 	echo ""
 	echo "	-h --help 		display this help and exit"
 	echo "	-v --version 		output version information and exit"

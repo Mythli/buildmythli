@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e
 CHECKOUT_ARCHIVE=0
 CHECKOUT_GIT=1
 CHECKOUT_FOLDER=2
@@ -96,7 +96,7 @@ function LookupCheckoutType {
 function LookupGenTool {
 	local dir=$1
 	
-	if [ -e "$dir/CMakeLists.txt" ]; then
+	if [ -e "$dir/src/CMakeLists.txt" ]; then
 		echo $GENTOOL_CMAKE
 		return 0
 	fi
@@ -117,7 +117,8 @@ function MakeBuild {
 	if [ -z $buildDir ]; then
 		buildDir="$dir/build"
 	fi
-	make --directory="$buildDir" -j$(GetNumberOfCores) 2>&1 | tee "$dir/log/make.log"
+	(cd "$buildDir" && \
+	make -j$(GetNumberOfCores) 2>&1 | tee "$dir/log/make.log")
 }
 
 function InstallBuild {
@@ -133,49 +134,63 @@ function InstallBuild {
 function GenCMake {
 	local dir=$1
 	local genArgsStr=$2
-	
 	local argStr=""
-	if [ "$genArgsStr" ]; then
-		eval "declare -A GenArgs="${genArgsStr#*=}
-		for argName in "${!GenArgs[@]}"; do
-			local argValue=${GenArgs["$argName"]}
-			argStr="$argStr -D$argName=$argValue"
+	
+	# check if serialized hashmap is defined and, is not empty
+	if [[ "$genArgsStr" =~ ^.*\(.+\).*$ ]]; then
+		# deserialize hashmap
+		eval "declare -A genArgs="${genArgsStr#*=}
+		# build cmake parameter string from hashmap
+		for argName in "${!genArgs[@]}"; do
+			local argValue=${genArgs["$argName"]}
+			argStr="$argStr-D$argName=$argValue"
 		done
 	fi
 	
-	cd "$dir/build"
-	cmake "$dir/src" "$argStr" 2>&1 | tee "$dir/log/gen.log"
+	(cd "$dir/build" && \
+	cmake "$dir/src $argStr" 2>&1 | tee "$dir/log/gen.log")
 }
 
 function GenAutoTools {
 	local dir=$1
 	local genArgsStr=$2
+	local argStr=""
 	
-	local argStr="--builddir=$dir/build"
-	if [ "$genArgsStr" ]; then
-		eval "declare -A GenArgs="${genArgsStr#*=}
-		for argName in "${!GenArgs[@]}"; do
-			local argValue=${GenArgs["$argName"]}
-			argStr="$argStr --$argName=$argValue"
-		done
+	# check if serialized hashmap is defined and, is not empty
+	if [[ "$genArgsStr" =~ ^.*\(.+\).*$ ]]; then
+		# deserialize hashmap
+		eval "declare -A genArgs="${genArgsStr#*=}
+	else
+		declare -A genArgs=()
 	fi
-		
-	cd "$dir/src"
-	$(FindConfigure "$dir") "$argStr" 2>&1 | tee "$dir/log/gen.log"
+	
+	# set default builddir if not specified
+	if [ -z ${genArgs["--builddir"]} ]; then
+		genArgs["builddir"]="$dir/build"
+	fi
+	
+	# build autotools parameter string from hashmap
+	for argName in "${!genArgs[@]}"; do
+		local argValue=${genArgs["$argName"]}
+		argStr="$argStr--$argName=$argValue"
+	done
+	
+	(cd "$dir/src" && \
+	$(FindConfigure "$dir") "$argStr" 2>&1 | tee "$dir/log/gen.log")
 }
 
 function UpdateGit {
   local dir=$1
   
-  cd "$dir/src"
-  git pull 2>&1 | tee -a "$dir/log/update.log"
+  (cd "$dir/src" \
+  git pull 2>&1 | tee -a "$dir/log/update.log")
 }
 
 function UpdateSvn {
 	local dir=$1
 	
-	cd "$dir/src"
-	svn update  2>&1 | tee "$dir/log/gen.log"
+	(cd "$dir/src" && \
+	svn update  2>&1 | tee "$dir/log/gen.log")
 }
 
 function CheckoutSvn {
@@ -189,8 +204,8 @@ function CheckoutSvn {
 	if [ $branche ]; then
 		repoUrl="$url/branches/$branche"
 	fi
-	cd $dir
-	svn checkout "$url/trunk" "$dir/src" 2>&1 | tee "$dir/log/init.log"
+	(cd $dir \
+	svn checkout "$url/trunk" "$dir/src" 2>&1 | tee "$dir/log/init.log")
 }
 
 function CheckoutGit {

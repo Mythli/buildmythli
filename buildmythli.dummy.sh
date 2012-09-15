@@ -9,31 +9,42 @@ CFXDefault=$(tput sgr0)
 
 
 if [[ -z "$@" ]]; then
-	echo "Usage: install uninstall update"
+	echo "Usage: compile update install uninstall upgrade"
 	exit 0
 fi
 
 declare -A GenArgs=()
 
-case "$1" in
-	install)
-		echo -e "${CFXBold}Installing build...${CFXDefault}"
-		InstallBuild "$BaseDir"
-		echo -e "${CFXGreen}Build installed.${CFXDefault}"
-	;;
-	uninstall)
-		
-	;;
-	update)
-		echo -e "${CFXBold}Updating source...${CFXDefault}"
-		Update "$BaseDir"
-		
-		echo -e "${CFXBold}Generating makefiles...${CFXDefault}"
-		GenMakeFiles "$BaseDir" $(declare -p GenArgs)
-		
-		echo -e "${CFXBold}Compiling...${CFXDefault}"
-		MakeBuild "$BaseDir"
-		
-		echo -e "${CFXGreen}Update succesful.${CFXDefault}"
-	;;
-esac
+function BuildMythli
+{
+	case "$1" in 
+		'compile')
+			echo -e "${CFXBold}Generating makefiles...${CFXDefault}"
+			GenMakeFiles "$BaseDir" $(declare -p GenArgs)
+			
+			echo -e "${CFXBold}Compiling...${CFXDefault}"
+			MakeBuild "$BaseDir"
+			
+			echo -e "${CFXGreen}Update succesful.${CFXDefault}"
+		;;
+		'update')
+			echo -e "${CFXBold}Updating source...${CFXDefault}"
+			Update "$BaseDir"
+		;;
+		'install')
+			echo -e "${CFXBold}Installing build...${CFXDefault}"
+			InstallBuild "$BaseDir"
+			echo -e "${CFXGreen}Build installed.${CFXDefault}"
+		;;
+		'uninstall')
+			
+		;;
+		'upgrade')
+			BuildMythli "update"
+			BuildMythli "compile"
+			BuildMythli "install"
+		;;
+	esac
+}
+
+BuildMythli $1
