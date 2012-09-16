@@ -28,13 +28,13 @@ function GetNumberOfCores {
 
 function CreateFolderStructure {
 	local dir=$1
-	
+
 	mkdir -p "$dir/"{build,log,src}
 }
 
 function FindConfigure {
 	local dir=$1
-	
+
 	local configureBinarys=(
 		"configure"
 		"configure.sh"
@@ -52,7 +52,7 @@ function FindConfigure {
 function ParseCheckoutType {
 	local dir=$1
 	local url=$2
-	
+
 	if [ -z "$url" ]; then
 		if [ -n "$dir" ]; then
 			echo $CHECKOUT_FOLDER
@@ -81,7 +81,7 @@ function ParseCheckoutType {
 
 function LookupCheckoutType {
 	local dir=$1
-	
+
 	if [ -d "$dir/src/.git" ]; then
 		echo $CHECKOUT_GIT
 		return 0
@@ -95,7 +95,7 @@ function LookupCheckoutType {
 
 function LookupGenTool {
 	local dir=$1
-	
+
 	if [ -e "$dir/src/CMakeLists.txt" ]; then
 		echo $GENTOOL_CMAKE
 		return 0
@@ -113,7 +113,7 @@ function LookupGenTool {
 function MakeBuild {
 	local dir=$1
 	local buildDir=$2
-	
+
 	if [ -z $buildDir ]; then
 		buildDir="$dir/build"
 	fi
@@ -135,7 +135,7 @@ function GenCMake {
 	local dir=$1
 	local genArgsStr=$2
 	local argStr=""
-	
+
 	# check if serialized hashmap is defined and, is not empty
 	if [[ "$genArgsStr" =~ ^.*\(.+\).*$ ]]; then
 		# deserialize hashmap
@@ -146,7 +146,7 @@ function GenCMake {
 			argStr="$argStr-D$argName=$argValue"
 		done
 	fi
-	
+
 	(cd "$dir/build" && \
 	cmake "$dir/src $argStr" 2>&1 | tee "$dir/log/gen.log")
 }
@@ -155,7 +155,7 @@ function GenAutoTools {
 	local dir=$1
 	local genArgsStr=$2
 	local argStr=""
-	
+
 	# check if serialized hashmap is defined and, is not empty
 	if [[ "$genArgsStr" =~ ^.*\(.+\).*$ ]]; then
 		# deserialize hashmap
@@ -163,18 +163,18 @@ function GenAutoTools {
 	else
 		declare -A genArgs=()
 	fi
-	
+
 	# set default builddir if not specified
 	if [ -z ${genArgs["--builddir"]} ]; then
 		genArgs["builddir"]="$dir/build"
 	fi
-	
+
 	# build autotools parameter string from hashmap
 	for argName in "${!genArgs[@]}"; do
 		local argValue=${genArgs["$argName"]}
 		argStr="$argStr--$argName=$argValue"
 	done
-	
+
 	(cd "$dir/src" && \
 	$(FindConfigure "$dir") "$argStr" 2>&1 | tee "$dir/log/gen.log")
 }
@@ -188,7 +188,7 @@ function UpdateGit {
 
 function UpdateSvn {
 	local dir=$1
-	
+
 	(cd "$dir/src" && \
 	svn update  2>&1 | tee "$dir/log/gen.log")
 }
@@ -198,9 +198,9 @@ function CheckoutSvn {
 	local url=$2
 	local branche=$3
 	local repoUrl="$url/trunk";
-	
+
 	CreateFolderStructure "$dir"
-	
+
 	if [ $branche ]; then
 		repoUrl="$url/branches/$branche"
 	fi
@@ -212,9 +212,9 @@ function CheckoutGit {
 	local dir=$1
 	local url=$2
 	local branche=$3
-	
+
 	CreateFolderStructure "$dir"
-	
+
 	git clone "$url" "$dir/src" 2>&1 | tee "$dir/log/init.log"
 	if [ $branche ]; then
 		cd "$dir/src"
@@ -225,16 +225,16 @@ function CheckoutGit {
 function CheckoutArchive {
 	local dir=$1
 	local url=$2
-	
+
 	CreateFolderStructure "$dir"
-	
+
 	local fileName=$(mktemp)
 	wget -O "$fileName" "$url" 2>&1 | tee "$dir/log/init.log"
 	tar -vxzf "$fileName" -C "$dir/src" 2>&1 | tee -a "$dir/log/init.log"
-	local archiveDirs=$( ls "$dir/src")
+	local archiveDirs=$(ls "$dir/src")
 	for i in $archiveDirs; do
-		mv "$dir/src/$i/"* "$dir/src"
-		rmdir "$dir/src/$i"
+		(mv "$dir/src/$i/"* "$dir/src" && \
+		rmdir "$dir/src/$i")
 	done
 	rm $fileName
 }
@@ -255,7 +255,7 @@ function CheckoutFolder() (
 function CheckoutCopyFolder {
 	local dir=$1
 	local url=$2
-	
+
 	CreateFolderStructure "$dir"
 	cp -r "$url" "$dir/src"
 }
@@ -264,7 +264,7 @@ function Checkout {
 	local dir=$1
 	local url=$2
 	local branche=$3
-		
+
 	case $(ParseCheckoutType "$dir" "$url") in
 		$CHECKOUT_ARCHIVE)
 			echo $CHECKOUT_ARCHIVE
@@ -296,7 +296,7 @@ function Checkout {
 
 function Update {
 	local dir=$1
-	
+
 	case $(LookupCheckoutType "$dir") in
 		$CHECKOUT_GIT)
 			echo $CHECKOUT_GIT
@@ -315,7 +315,7 @@ function Update {
 function GenMakeFiles {
 	local dir=$1
 	local genArgs=$2
-	
+
 	case $(LookupGenTool "$dir") in
 		$GENTOOL_CMAKE)
 			echo $GENTOOL_CMAKE
