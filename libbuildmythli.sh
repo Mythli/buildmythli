@@ -231,10 +231,10 @@ function CheckoutArchive {
 	local fileName=$(mktemp)
 	wget -O "$fileName" "$url" 2>&1 | tee "$dir/log/init.log"
 	tar -vxzf "$fileName" -C "$dir/src" 2>&1 | tee -a "$dir/log/init.log"
-	local archiveDirs=$( ls "$dir/src")
+	local archiveDirs=$(ls "$dir/src")
 	for i in $archiveDirs; do
-		mv "$dir/src/$i/"* "$dir/src"
-		rmdir "$dir/src/$i"
+		(mv "$dir/src/$i/"* "$dir/src" && \
+		rmdir "$dir/src/$i")
 	done
 	rm $fileName
 }
